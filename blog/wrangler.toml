@@ -1,0 +1,13 @@
+# Cloudflare Pages configuration for blog.example.com
+
+name = "my-blog"
+compatibility_date = "2025-01-01"
+pages_build_output_dir = "public"
+
+[vars]
+IP_SALT = "CHANGE_ME_RANDOM_SALT"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "blog-comments"
+database_id = "YOUR_D1_DATABASE_ID"

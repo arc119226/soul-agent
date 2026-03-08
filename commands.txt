@@ -1,0 +1,15 @@
+start - 開始使用
+help - 使用說明
+menu - 互動式指令選單
+team - AI 團隊儀表板
+status - 系統狀態 (子指令: me, system)
+cc - Claude Code 管理 (子指令: new, resume, abort, cwd, status)
+agents - Agent 管理 (子指令: pipeline, ghpatrol)
+cost - Agent 成本報告
+workers - 背景任務狀態
+content - 內容管理 (子指令: blog, site, report, research)
+evolve - 進化管理 (子指令: run, goals, add, rm, suggest, log, validate)
+soul - 自我認知 (子指令: reflect, diary, dream, speak, achievements, metacognition)
+plan - 管理計劃
+sys - 系統管理 (子指令: restart, shutdown, dormant, logs, info, files, run, git, proactive, schedules)
+search - 搜尋與知識庫 (子指令: learn, kb)

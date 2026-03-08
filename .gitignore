@@ -137,3 +137,68 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Bot-specific
+data/
+.plugin-cache/
+oldcode/
+
+# Blog (Hexo)
+blog/public/
+blog/db.json
+blog/.deploy*/
+
+# ─── Soul runtime data (not for distribution) ───
+
+# Runtime identity & state
+soul/identity.json
+soul/vitals.json
+soul/sessions.json
+soul/users.json
+soul/milestones.json
+soul/learning-patterns.json
+soul/research-index.json
+soul/schedules.json
+
+# Event streams (append-only JSONL)
+soul/narrative.jsonl
+soul/diary.jsonl
+soul/dreams.jsonl
+soul/reflections.jsonl
+
+# Runtime directories (entire contents)
+soul/agent-reports/
+soul/checkpoints/
+soul/metrics/
+soul/memory/
+soul/staging/
+soul/blog/
+soul/evolution/
+soul/narrative-archive/
+soul/exploration-reports/
+soul/explorations/
+soul/market-research/
+soul/reports/
+soul/daily-reports/
+soul/agent-tasks/*
+!soul/agent-tasks/.gitkeep
+
+# Knowledge base (runtime accumulation)
+soul/knowledge/index.json
+soul/knowledge/entries/*
+!soul/knowledge/entries/.gitkeep
+!soul/knowledge/archive/.gitkeep
+
+# Agent configs (rendered from templates at setup time)
+# soul/agents/*.json is gitignored; templates in soul/agents/templates/ are tracked
+soul/agents/*.json
+!soul/agents/templates/
+
+# Skill usage stats
+soul/skills/.usage-stats.json
+
+# Legacy report files
+soul/github-patrol-report*.md
+
+# Generated from template
+.mcp.json

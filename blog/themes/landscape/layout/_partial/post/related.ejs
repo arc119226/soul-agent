@@ -1,0 +1,30 @@
+<%
+  const relatedPosts = related_posts(post, { maxRelated: 5, minSimilarity: 0.1 });
+  if (relatedPosts && relatedPosts.length > 0) {
+%>
+<aside class="related-posts">
+  <h3 class="related-posts-title">
+    <i class="fa fa-lightbulb-o"></i> 你可能也會感興趣
+  </h3>
+  <ul class="related-posts-list">
+    <% relatedPosts.forEach(function(item) { %>
+      <li class="related-post-item">
+        <a href="<%- url_for(item.path) %>" class="related-post-link">
+          <span class="related-post-title"><%= item.title %></span>
+          <% if (item.score > 0.3) { %>
+            <span class="related-badge high">高度相關</span>
+          <% } else if (item.score > 0.1) { %>
+            <span class="related-badge medium">相關</span>
+          <% } %>
+        </a>
+        <% if (item.excerpt) { %>
+          <p class="related-post-excerpt"><%= strip_html(item.excerpt).substring(0, 80) %>...</p>
+        <% } %>
+        <time class="related-post-date" datetime="<%= item.date.toISOString() %>">
+          <%= item.date.format('YYYY-MM-DD') %>
+        </time>
+      </li>
+    <% }); %>
+  </ul>
+</aside>
+<% } %>

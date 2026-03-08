@@ -1,0 +1,121 @@
+<head>
+  <meta charset="utf-8">
+  <meta name="google-adsense-account" content="ca-pub-3394070250864253">
+  <%- partial('google-analytics') %>
+  <%
+  var title = page.title;
+
+  if (is_archive()){
+    title = __('archive_a');
+    if (is_month()){
+      title += ': ' + page.year + '/' + page.month;
+    } else if (is_year()){
+      title += ': ' + page.year;
+    }
+  } else if (is_category()){
+    title = __('category') + ': ' + page.category;
+  } else if (is_tag()){
+    title = __('tag') + ': ' + page.tag;
+  }
+
+  // Build clean description (strip HTML from excerpt)
+  var desc = page.description
+    || (page.excerpt ? strip_html(page.excerpt).trim().substring(0, 200) : '')
+    || config.description;
+
+  // Build keywords
+  var kw = page.keywords
+    || (page.tags && page.tags.length ? page.tags.map(function(t){ return t.name; }).join(', ') : '')
+    || (config.keywords ? config.keywords.join(', ') : '');
+  %>
+  <title><% if (title){ %><%= title %> | <% } %><%= config.title %></title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+  <!-- SEO Meta Tags -->
+  <meta name="description" content="<%= desc %>">
+  <% if (kw) { %>
+  <meta name="keywords" content="<%= kw %>">
+  <% } %>
+  <meta name="author" content="<%= page.author || config.author %>">
+  <% if (page.date) { %>
+  <meta name="article:published_time" content="<%= page.date.toISOString() %>">
+  <% } %>
+  <% if (page.updated) { %>
+  <meta name="article:modified_time" content="<%= page.updated.toISOString() %>">
+  <% } %>
+
+  <!-- Open Graph + Twitter Card (via Hexo open_graph helper) -->
+  <%- open_graph({
+    description: desc,
+    twitter_id: theme.twitter,
+    twitter_card: 'summary',
+    fb_admins: theme.fb_admins,
+    fb_app_id: theme.fb_app_id
+  }) %>
+
+  <!-- Canonical URL -->
+  <link rel="canonical" href="<%= page.permalink || config.url %>" />
+
+  <!-- JSON-LD Structured Data -->
+  <% if (page.layout === 'post') { %>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "headline": "<%= page.title %>",
+    "description": "<%= desc.replace(/"/g, '\\"') %>",
+    "author": {
+      "@type": "Person",
+      "name": "<%= page.author || config.author %>"
+    },
+    "datePublished": "<%= page.date ? page.date.toISOString() : '' %>",
+    "dateModified": "<%= page.updated ? page.updated.toISOString() : (page.date ? page.date.toISOString() : '') %>",
+    "publisher": {
+      "@type": "Person",
+      "name": "<%= config.author %>"
+    },
+    "mainEntityOfPage": {
+      "@type": "WebPage",
+      "@id": "<%= page.permalink %>"
+    },
+    "url": "<%= page.permalink %>"
+  }
+  </script>
+  <% } else { %>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "<%= config.title %>",
+    "description": "<%= config.description.replace(/"/g, '\\"') %>",
+    "url": "<%= config.url %>",
+    "author": {
+      "@type": "Person",
+      "name": "<%= config.author %>"
+    }
+  }
+  </script>
+  <% } %>
+
+  <% if (config.feed) { %>
+    <%- feed_tag() %>
+  <% } else if (theme.rss) { %>
+    <%- feed_tag(theme.rss) %>
+  <% } %>
+  <% if (theme.favicon){ %>
+    <%- favicon_tag(theme.favicon) %>
+  <% } %>
+  <% if (config.highlight.enable){ %>
+    <%- css('https://cdn.jsdelivr.net/npm/typeface-source-code-pro@0.0.71/index.min.css') %>
+  <% } %>
+  <!-- Google Fonts: Inter + JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+TC:wght@300;400;500&display=swap" rel="stylesheet">
+  <%- css('css/style') %>
+  <%- css('css/related-posts') %>
+  <% if (theme.fancybox){ %>
+    <%- css('fancybox/jquery.fancybox.min.css') %>
+  <% } %>
+  <%- css('https://cdn.jsdelivr.net/npm/fork-awesome@1.2.0/css/fork-awesome.min.css') %>
+</head>

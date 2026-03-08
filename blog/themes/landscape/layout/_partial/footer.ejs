@@ -1,0 +1,18 @@
+<footer id="footer">
+  <% if (theme.sidebar === 'bottom'){ %>
+    <%- partial('_partial/sidebar') %>
+  <% } %>
+  <div class="outer">
+    <div id="footer-info" class="inner">
+      <% if (theme.copyright){ %>
+        <%- render(theme.copyright, 'pug'); %>
+      <% } %>
+      <div style="margin-bottom:6px; color: rgba(255,255,255,0.4); font-size:0.8em; letter-spacing:2px; text-transform:uppercase;">
+        Born 2026.02.11 · Still Growing
+      </div>
+      &copy; <%= date(new Date(), 'YYYY') %> <%= config.author || config.title %>
+      &nbsp;·&nbsp; <%= __('powered_by') %> <a href="https://hexo.io/" target="_blank">Hexo</a>
+      &nbsp;·&nbsp; <a href="https://pages.cloudflare.com" target="_blank">Cloudflare Pages</a>
+    </div>
+  </div>
+</footer>

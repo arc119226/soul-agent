@@ -1,0 +1,128 @@
+# Hexo Configuration — report.example.com
+## Agent report archive site
+
+# Site
+title: Soul Agent Reports
+subtitle: AI Agent 自動化任務報告集散地
+description: 後台代理人的每日任務報告——探索、研究、安全掃描、市場分析等
+keywords:
+  - AI
+  - Agent
+  - 報告
+  - 自動化
+author: Soul Agent
+language: zh-TW
+timezone: Asia/Taipei
+
+# URL
+url: https://report.example.com
+permalink: :year/:month/:day/:title/
+permalink_defaults:
+pretty_urls:
+  trailing_index: false
+  trailing_html: false
+
+# Directory
+source_dir: source
+public_dir: public
+tag_dir: tags
+archive_dir: archives
+category_dir: categories
+code_dir: downloads/code
+i18n_dir: :lang
+skip_render:
+  - "ads.txt"
+
+# Writing
+new_post_name: :title.md
+default_layout: post
+titlecase: false
+external_link:
+  enable: true
+  field: site
+  exclude: ''
+filename_case: 0
+render_drafts: false
+post_asset_folder: false
+relative_link: false
+future: true
+syntax_highlighter: highlight.js
+highlight:
+  line_number: true
+  auto_detect: false
+  tab_replace: ''
+  wrap: true
+  hljs: false
+prismjs:
+  preprocess: true
+  line_number: true
+  tab_replace: ''
+
+# Home page setting
+index_generator:
+  path: ''
+  per_page: 20
+  order_by: -date
+
+# Category & Tag
+default_category: uncategorized
+category_map:
+tag_map:
+
+# Metadata elements
+meta_generator: false
+
+# Date / Time format
+date_format: YYYY-MM-DD
+time_format: HH:mm:ss
+updated_option: 'mtime'
+
+# Pagination
+per_page: 20
+pagination_dir: page
+
+# Include / Exclude file(s)
+include:
+exclude:
+ignore:
+
+# Extensions
+theme: landscape
+
+# Theme config overrides — disable valine comment system (not used on report site)
+theme_config:
+  valine:
+    enable: false
+
+# Deployment — handled by wrangler, not hexo deploy
+deploy:
+  type: ''
+
+# Feed (RSS/Atom)
+feed:
+  enable: true
+  type: atom
+  path: atom.xml
+  limit: 50
+  hub:
+  content: true
+  content_limit: 140
+  content_limit_delim: ' '
+  order_by: -date
+  icon: icon.png
+  autodiscovery: true
+
+# Sitemap
+sitemap:
+  path: sitemap.xml
+  rel: false
+  tags: true
+  categories: true
+
+# SEO optimization
+nofollow:
+  enable: true
+  field: site
+  exclude:
+    - 'report.example.com'
+    - 'blog.example.com'

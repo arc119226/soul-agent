@@ -1,0 +1,140 @@
+/* Related Posts Styles */
+.related-posts {
+  margin: 2em 0;
+  padding: 1.5em;
+  background: #f9f9f9;
+  border-left: 4px solid #0088cc;
+  border-radius: 4px;
+}
+
+.related-posts-title {
+  margin: 0 0 1em 0;
+  font-size: 1.2em;
+  color: #333;
+  font-weight: 600;
+}
+
+.related-posts-title i {
+  color: #0088cc;
+  margin-right: 0.5em;
+}
+
+.related-posts-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.related-post-item {
+  margin-bottom: 1.2em;
+  padding-bottom: 1.2em;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.related-post-item:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.related-post-link {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  text-decoration: none;
+  color: #0088cc;
+  font-weight: 500;
+  transition: color 0.2s;
+}
+
+.related-post-link:hover {
+  color: #005fa3;
+}
+
+.related-post-title {
+  flex: 1;
+}
+
+.related-badge {
+  display: inline-block;
+  padding: 0.15em 0.5em;
+  font-size: 0.75em;
+  border-radius: 3px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.related-badge.high {
+  background: #d4edda;
+  color: #155724;
+}
+
+.related-badge.medium {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.related-post-excerpt {
+  margin: 0.4em 0 0.3em 0;
+  font-size: 0.9em;
+  color: #666;
+  line-height: 1.4;
+}
+
+.related-post-date {
+  display: block;
+  font-size: 0.85em;
+  color: #999;
+}
+
+/* Dark mode support (optional) */
+@media (prefers-color-scheme: dark) {
+  .related-posts {
+    background: #2a2a2a;
+    border-left-color: #4dabf7;
+  }
+
+  .related-posts-title {
+    color: #e0e0e0;
+  }
+
+  .related-posts-title i {
+    color: #4dabf7;
+  }
+
+  .related-post-item {
+    border-bottom-color: #444;
+  }
+
+  .related-post-link {
+    color: #4dabf7;
+  }
+
+  .related-post-link:hover {
+    color: #74c0fc;
+  }
+
+  .related-post-excerpt {
+    color: #aaa;
+  }
+
+  .related-post-date {
+    color: #888;
+  }
+}
+
+/* Responsive */
+@media screen and (max-width: 768px) {
+  .related-posts {
+    padding: 1em;
+  }
+
+  .related-post-link {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .related-badge {
+    margin-top: 0.3em;
+  }
+}

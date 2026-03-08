@@ -1,0 +1,23 @@
+.channel-cta {
+  margin: 30px 0;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #f0f8ff 0%, #e8f4fd 100%);
+  border-left: 4px solid #0088cc;
+  border-radius: 0 8px 8px 0;
+}
+
+.channel-cta p {
+  margin: 0;
+  font-size: 0.95em;
+  line-height: 1.6;
+  color: #333;
+}
+
+.channel-cta a {
+  color: #0088cc;
+  text-decoration: none;
+}
+
+.channel-cta a:hover {
+  text-decoration: underline;
+}

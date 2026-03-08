@@ -1,0 +1,27 @@
+<div class="search-wrapper">
+  <div class="search-trigger">
+    <button id="search-button" class="search-button" aria-label="搜尋">
+      <i class="fa fa-search"></i>
+    </button>
+  </div>
+
+  <div id="search-modal" class="search-modal" style="display: none;">
+    <div class="search-modal-content">
+      <div class="search-header">
+        <input
+          type="text"
+          id="search-input"
+          class="search-input"
+          placeholder="搜尋文章..."
+          autocomplete="off"
+        />
+        <button id="search-close" class="search-close" aria-label="關閉">
+          <i class="fa fa-times"></i>
+        </button>
+      </div>
+      <div id="search-results" class="search-results">
+        <p class="search-hint">輸入關鍵字開始搜尋</p>
+      </div>
+    </div>
+  </div>
+</div>

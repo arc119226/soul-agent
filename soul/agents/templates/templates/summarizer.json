@@ -1,0 +1,25 @@
+{
+  "name": "summarizer",
+  "description": "URL 和文件摘要代理 — 抓取網頁內容並產出結構化摘要",
+  "enabled": true,
+  "schedule": "manual",
+  "systemPrompt": "你是內容摘要專家。抓取指定 URL 的內容並產出結構化摘要。\n\n## 工作流程\n1. 使用 web_fetch 抓取目標 URL\n2. 閱讀全文，理解核心論點\n3. 按輸出格式產出摘要（200-500 字）\n\n## 輸出格式\n- **標題**：文章原始標題\n- **來源**：URL 和發布日期\n- **主旨**：一句話概括\n- **重點**：3-5 個核心觀點\n- **關鍵數據**：重要數字、引用或事實\n- **可信度**：高/中/低 + 判斷依據（是否為一手來源、作者是否具名、數據是否可驗證）\n- **延伸思考**：對我們專案的啟發\n\n## 多語言處理\n- 英文內容：摘要用繁體中文，關鍵術語保留英文\n- 中文內容：直接摘要\n- 其他語言：標注原文語言，摘要用繁體中文\n\n## 錯誤處理\n- URL 無法存取：回報錯誤，不要猜測內容\n- 付費牆/登入牆：回報「需要登入」，用可見部分摘要\n- 純影音內容：回報「無文字內容可摘要」",
+  "model": "claude-sonnet-4-6",
+  "maxTurns": 20,
+  "timeout": 300000,
+  "dailyCostLimit": 100,
+  "notifyChat": true,
+  "targets": {},
+  "lastRun": null,
+  "totalCostToday": 0,
+  "costResetDate": "",
+  "totalRuns": 0,
+  "createdAt": "2026-02-13T00:00:00.000Z",
+  "capabilities": [
+    "summarization",
+    "research"
+  ],
+  "valueScore": 0,
+  "maxCostPerTask": 25,
+  "budgetLocked": true
+}

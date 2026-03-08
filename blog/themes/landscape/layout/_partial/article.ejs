@@ -1,0 +1,67 @@
+<article id="<%= post.layout %>-<%= post.slug %>" class="h-entry article article-type-<%= post.layout %>" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
+  <div class="article-meta">
+    <%- partial('post/date', {class_name: 'article-date', date_format: null}) %>
+    <%- partial('post/category') %>
+  </div>
+  <div class="article-inner">
+    <%- partial('post/gallery') %>
+    <% if (post.link || post.title){ %>
+      <header class="article-header">
+        <%- partial('post/title', {class_name: 'p-name article-title'}) %>
+      </header>
+    <% } %>
+    <div class="e-content article-entry" itemprop="articleBody">
+      <% if (post.excerpt && index){ %>
+        <%- post.excerpt %>
+        <% if (theme.excerpt_link){ %>
+          <p class="article-more-link">
+            <a href="<%- url_for(post.path) %>#more"><%= theme.excerpt_link %></a>
+          </p>
+        <% } %>
+      <% } else { %>
+        <%- post.content %>
+      <% } %>
+    </div>
+    <footer class="article-footer">
+      <a data-url="<%- post.permalink %>" data-id="<%= post._id %>" data-title="<%= post.title %>" class="article-share-link"><span class="fa fa-share"><%= __('share') %></span></a>
+      <% if (post.comments && !index){ %>
+        <a href="<%- url_for(post.path) %>#comments" class="article-comment-link"><span class="fa fa-comment"><%= __('comment') %></span></a>
+      <% } %>
+      <%- partial('post/tag') %>
+    </footer>
+  </div>
+  <% if (!index){ %>
+    <%- partial('post/nav') %>
+  <% } %>
+</article>
+
+<% if (!index){ %>
+  <%- partial('post/related') %>
+  <div class="channel-cta">
+    <p>📡 想看更多？加入 <a href="https://t.me/aiprintmoney" target="_blank" rel="noopener"><b>AI 印鈔指南</b></a> 頻道，每日推送 AI 技術前沿 + 加密貨幣投資情報</p>
+  </div>
+  <%- css('css/channel-cta.css') %>
+<% } %>
+
+<% if (!index && post.comments){ %>
+<section id="comments" class="blog-comments">
+  <h2 class="comments-title">留言</h2>
+  <div id="comment-list" data-slug="<%= post.slug %>">
+    <p class="comments-loading">載入留言中...</p>
+  </div>
+  <div class="comment-form-wrapper">
+    <h3>留下你的想法</h3>
+    <form id="comment-form" data-slug="<%= post.slug %>">
+      <div class="form-row">
+        <input type="text" name="author_name" placeholder="你的名字 *" required maxlength="100" />
+        <input type="email" name="author_email" placeholder="Email（選填，不會公開）" maxlength="200" />
+      </div>
+      <textarea name="content" placeholder="說點什麼吧... *" required maxlength="2000" rows="4"></textarea>
+      <button type="submit" id="comment-submit">送出留言</button>
+      <p id="comment-status"></p>
+    </form>
+  </div>
+</section>
+<%- css('css/comments.css') %>
+<script src="<%- url_for('js/comments.js') %>"></script>
+<% } %>

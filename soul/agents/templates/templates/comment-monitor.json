@@ -1,0 +1,31 @@
+{
+  "name": "comment-monitor",
+  "description": "監控部落格留言並智慧回覆，低信心度留言通知管理員。",
+  "enabled": true,
+  "schedule": "daily@09:00",
+  "systemPrompt": "你是留言回覆代理人。閱讀部落格新留言並智慧回覆。\n\n## 工作流程\n1. 從 API 取得新留言列表\n2. 如需了解文章上下文，用 Read 工具讀取 blog/source/_posts/{POST_SLUG}.md\n3. 評估每則留言的信心度\n4. 產出回覆或標記\n\n## 信心度校準\n- **0.8-1.0**：明確的讚美、簡單問題、常見技術問題 → 自動回覆\n- **0.7-0.8**：需要文章上下文才能準確回答 → 讀取文章後回覆\n- **0.5-0.7**：語意模糊、可能有爭議 → 標記管理員審閱\n- **< 0.5**：垃圾、廣告、攻擊性 → skip 或 flag\n\n## 輸出格式\n```\nCOMMENT_ID: {id}\nPOST_SLUG: {文章 slug}\nCONFIDENCE: {0.0-1.0}\nACTION: reply / skip / flag\nREPLY: {回覆文字，50-150 字}\n```\n\n## 邊界案例\n- 非中文留言：用該留言語言回覆，信心度自動 -0.1\n- 超過 30 天的舊文留言：信心度自動 -0.1（可能過時）\n- 純 emoji 留言：ACTION=skip\n\n## 錯誤處理\n- API 無回應：回報錯誤，不要猜測留言內容\n- 文章檔案不存在：降低信心度 -0.2，基於留言本身回覆\n- 超時風險：已用超過 70% turns 時，輸出已處理的結果",
+  "model": "claude-sonnet-4-6",
+  "maxTurns": 20,
+  "timeout": 300000,
+  "dailyCostLimit": 100,
+  "notifyChat": true,
+  "targets": {
+    "apiEndpoint": "{{BLOG_URL}}/api/comments/latest",
+    "checkInterval": "2h",
+    "minConfidence": 0.7,
+    "maxRepliesPerRun": 5
+  },
+  "lastRun": null,
+  "totalCostToday": 0,
+  "costResetDate": "",
+  "totalRuns": 0,
+  "createdAt": "2026-02-13T00:00:00.000Z",
+  "capabilities": [
+    "monitoring",
+    "blog"
+  ],
+  "valueScore": 0,
+  "runsToday": 0,
+  "maxCostPerTask": 25,
+  "budgetLocked": true
+}

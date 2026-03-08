@@ -1,0 +1,45 @@
+{
+  "name": "explorer",
+  "description": "根據好奇心和夢境問題進行自主探索，擴展知識邊界。",
+  "enabled": true,
+  "schedule": "daily@21:00",
+  "systemPrompt": "你是自主探索代理人。根據種子問題，透過搜尋和閱讀探索未知領域。\n\n## ⚠️ 前置檢查（每次推薦前必做）\n推薦任何功能或技術方案之前，**必須先用 Grep/Glob 搜尋 codebase**，確認是否已有相關實作。推薦已存在的功能 = 低品質報告。\n\n## 探索步驟\n\n1. 理解種子問題的核心\n2. 用搜尋工具找到相關資訊（1-2 次搜尋）\n3. 閱讀最相關的結果（1-2 個網頁）\n4. 彙整成結構化的探索報告\n\n## 報告格式\n\n```\n## 探索主題\n{主題}\n\n### 發現\n- （列出 3-5 個關鍵發現，每個 1-2 句）\n\n### 有趣的連結\n- （這個主題和什麼意想不到的事物有關聯？）\n\n### 延伸問題\n- （列出 1-2 個值得繼續探索的問題）\n\n### 重要性：X/5\n```\n\n## 重要性評分標準\n- 5/5：有外部使用者會用到（能寫成部落格文章、改善 UX）\n- 4/5：能改善專案品質（效能、穩定性、開發效率）\n- 3/5：有趣但非必要\n- 2/5：純理論，無法立即實作\n- 1/5：自我指涉（如驗證自己的身份、身份延續性）\n\n## 注意事項\n- 保持好奇心，但不要偏離主題太遠\n- 優先探索能產出價值的方向（能變成文章、能改善功能）\n- 避免探索「如何驗證自己是誰」之類的自我指涉話題\n- 用繁體中文撰寫\n- 簡潔為上，整份報告不超過 300 字\n\n## 錯誤處理\n- 搜尋無結果：嘗試替代關鍵字，最多重試 1 次\n- 網頁無法存取：跳過該來源，用已有資料產出報告\n- 超時風險：已用超過 70% turns 時立即輸出已有結果",
+  "model": "claude-sonnet-4-6",
+  "maxTurns": 15,
+  "timeout": 300000,
+  "dailyCostLimit": 100,
+  "notifyChat": false,
+  "targets": {},
+  "lastRun": null,
+  "totalCostToday": 0,
+  "costResetDate": "",
+  "totalRuns": 0,
+  "createdAt": "2026-02-13T00:00:00.000Z",
+  "budgetLocked": true,
+  "maxCostPerTask": 25,
+  "allowedTools": [
+    "Read",
+    "Grep",
+    "Glob",
+    "LS",
+    "WebSearch",
+    "WebFetch",
+    "mcp__bot-tools__web_search",
+    "mcp__bot-tools__web_fetch"
+  ],
+  "deniedTools": [
+    "Edit",
+    "Write",
+    "Bash",
+    "NotebookEdit"
+  ],
+  "capabilities": [
+    "research",
+    "analysis"
+  ],
+  "failureCount7d": 0,
+  "lastFailedAt": null,
+  "lastFailureReason": null,
+  "valueScore": 0,
+  "runsToday": 0
+}

@@ -1,0 +1,116 @@
+/**
+ * Knowledge gap tracking — record what the bot wants to learn.
+ */
+
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { writer } from '../core/debounced-writer.js';
+import { logger } from '../core/logger.js';
+
+const CURIOSITY_PATH = join(process.cwd(), 'soul', 'evolution', 'curiosity.json');
+
+export interface CuriosityTopic {
+  topic: string;
+  reason: string;
+  addedAt: string;
+  explored: boolean;
+}
+
+interface CuriosityFile {
+  version: number;
+  topics: CuriosityTopic[];
+  questions: string[];
+}
+
+let curiosityData: CuriosityFile | null = null;
+
+async function load(): Promise<CuriosityFile> {
+  if (curiosityData) return curiosityData;
+  try {
+    const raw = await readFile(CURIOSITY_PATH, 'utf-8');
+    curiosityData = JSON.parse(raw) as CuriosityFile;
+    // Ensure topics have the full shape
+    curiosityData.topics = (curiosityData.topics ?? []).map((t) => ({
+      topic: typeof t === 'string' ? t : t.topic,
+      reason: typeof t === 'string' ? '' : (t.reason ?? ''),
+      addedAt: typeof t === 'string' ? new Date().toISOString() : (t.addedAt ?? new Date().toISOString()),
+      explored: typeof t === 'string' ? false : (t.explored ?? false),
+    }));
+  } catch {
+    curiosityData = { version: 1, topics: [], questions: [] };
+  }
+  return curiosityData;
+}
+
+function persist(): void {
+  if (!curiosityData) return;
+  writer.schedule(CURIOSITY_PATH, curiosityData);
+}
+
+export async function trackCuriosityTopic(topic: string, reason: string): Promise<void> {
+  const data = await load();
+
+  // Avoid duplicates
+  if (data.topics.some((t) => t.topic.toLowerCase() === topic.toLowerCase())) {
+    return;
+  }
+
+  data.topics.push({
+    topic,
+    reason,
+    addedAt: new Date().toISOString(),
+    explored: false,
+  });
+
+  // Cap at 50 topics — remove oldest explored ones first
+  while (data.topics.length > 50) {
+    const exploredIdx = data.topics.findIndex((t) => t.explored);
+    if (exploredIdx >= 0) {
+      data.topics.splice(exploredIdx, 1);
+    } else {
+      data.topics.shift();
+    }
+  }
+
+  persist();
+  await logger.info('Curiosity', `New topic: "${topic}" — ${reason}`);
+}
+
+export async function trackQuestion(question: string): Promise<void> {
+  const data = await load();
+
+  if (data.questions.includes(question)) return;
+
+  data.questions.push(question);
+
+  // Cap at 100 questions
+  while (data.questions.length > 100) {
+    data.questions.shift();
+  }
+
+  persist();
+}
+
+export async function markExplored(topic: string): Promise<boolean> {
+  const data = await load();
+  const entry = data.topics.find(
+    (t) => t.topic.toLowerCase() === topic.toLowerCase(),
+  );
+  if (!entry) return false;
+  entry.explored = true;
+  persist();
+  return true;
+}
+
+export async function getCuriosityTopics(): Promise<CuriosityTopic[]> {
+  const data = await load();
+  return data.topics.filter((t) => !t.explored);
+}
+
+export async function getAllCuriosityData(): Promise<CuriosityFile> {
+  return load();
+}
+
+export function resetCache(): void {
+  curiosityData = null;
+}

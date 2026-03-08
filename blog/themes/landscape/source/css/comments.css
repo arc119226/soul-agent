@@ -1,0 +1,104 @@
+.blog-comments {
+  max-width: 800px;
+  margin: 2em auto;
+  padding: 0 20px;
+}
+.comments-title {
+  font-size: 1.4em;
+  border-bottom: 2px solid #eee;
+  padding-bottom: 0.5em;
+  margin-bottom: 1em;
+}
+.comment-item {
+  border-left: 3px solid #e0e0e0;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  background: #fafafa;
+  border-radius: 0 8px 8px 0;
+}
+.comment-item.ai-reply {
+  border-left-color: #7c4dff;
+  background: #f5f0ff;
+}
+.comment-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.comment-author {
+  font-weight: bold;
+  color: #333;
+}
+.ai-badge {
+  background: #7c4dff;
+  color: white;
+  font-size: 0.7em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 6px;
+}
+.comment-date {
+  font-size: 0.85em;
+  color: #999;
+}
+.comment-content {
+  line-height: 1.6;
+  color: #444;
+  white-space: pre-wrap;
+}
+.comment-replies {
+  margin-left: 24px;
+  margin-top: 8px;
+}
+.comment-form-wrapper {
+  margin-top: 2em;
+  padding-top: 1em;
+  border-top: 1px solid #eee;
+}
+.comment-form-wrapper h3 {
+  font-size: 1.1em;
+  margin-bottom: 1em;
+}
+.form-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.form-row input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+}
+#comment-form textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  resize: vertical;
+  box-sizing: border-box;
+}
+#comment-submit {
+  margin-top: 10px;
+  padding: 10px 24px;
+  background: #333;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+#comment-submit:hover { background: #555; }
+#comment-submit:disabled { background: #ccc; cursor: not-allowed; }
+#comment-status { margin-top: 8px; font-size: 0.9em; }
+#comment-status.error { color: #e53935; }
+#comment-status.success { color: #43a047; }
+.comments-loading { color: #999; font-style: italic; }
+.no-comments { color: #999; padding: 1em 0; }
+@media (max-width: 600px) {
+  .form-row { flex-direction: column; gap: 8px; }
+}

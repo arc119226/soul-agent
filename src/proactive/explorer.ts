@@ -1,0 +1,536 @@
+/**
+ * Autonomous exploration engine — curiosity-driven discovery.
+ *
+ * Not a fixed-schedule agent but a meta-system that dynamically generates
+ * one-off exploration tasks based on current curiosity, dream questions,
+ * and recent discoveries. Hooks into heartbeat:tick via the proactive engine.
+ *
+ * Trigger gates (all must pass):
+ *   1. Lifecycle state = resting or active (not dormant)
+ *   2. Owner not busy (estimateOwnerState ≠ busy)
+ *   3. proactiveLevel > 0.3
+ *   4. Cooldown: > 2h since last exploration
+ *   5. Free worker available (isBusy check)
+ *
+ * Seed priority: dream questions > business model > curiosity topics > report findings > creative random
+ */
+
+import { logger } from '../core/logger.js';
+import { config } from '../config.js';
+import { isBusy } from '../claude/claude-code.js';
+import { enqueueTask } from '../agents/worker-scheduler.js';
+import { appendNarrative } from '../identity/narrator.js';
+import { readFile, readdir } from 'node:fs/promises';
+import { join } from 'node:path';
+
+// ── Constants ────────────────────────────────────────────────────────
+
+/** Minimum interval between explorations (2 hours in ms) */
+const EXPLORATION_COOLDOWN_MS = 2 * 60 * 60 * 1000;
+
+/** If report quality is below this threshold, extend cooldown (avoid wasting worker cycles) */
+const MIN_QUALITY_THRESHOLD = 0.3;
+
+/** Cooldown multiplier when quality is below threshold (next exploration delayed 3x) */
+const LOW_QUALITY_COOLDOWN_MULTIPLIER = 3;
+
+/** Worker IDs to check for availability */
+const WORKER_IDS = [-1, -2, -3] as const;
+
+/** Business model exploration seeds — AI monetization and value creation research */
+const BUSINESS_SEEDS = [
+  'AI Agent as a Service：哪些公司靠 AI Agent 訂閱制賺錢？定價模型和單位經濟學分析',
+  'Telegram Bot 變現模式：付費訂閱、API 轉售、內容付費牆的實際收入數據',
+  'AI 內容工廠：自動產生 SEO 文章、社群貼文、電子報的商業案例和月收入',
+  'MCP Tool Marketplace：Claude/OpenAI 工具市場的商機，開發者如何靠工具賺錢',
+  'AI 輔助交易信號：加密貨幣/股票的 AI 分析訂閱服務，實際勝率和收費模式',
+  'Micro-SaaS with AI：一人公司用 AI 建立 SaaS 產品的成功案例和技術棧',
+  'AI 自動化顧問服務：幫企業導入 AI Agent 的諮詢收費模式和市場規模',
+  'Cloudflare Workers + AI：邊緣運算 AI 服務的計費模式和成本優化策略',
+  'AI Newsletter 和付費社群：技術內容創作者的訂閱收入模式和成長策略',
+  'Data Pipeline as a Service：AI 資料處理和清洗服務的定價與客戶取得成本',
+];
+
+/** Creative random seeds — fallback when no other seeds available (tech-focused) */
+const CREATIVE_SEEDS = [
+  'TypeScript 5.x 最新特性有哪些？哪些對 Node.js 後端開發最有影響？',
+  'grammY Telegram Bot 框架有什麼進階用法？如何優化長時間運行的 bot？',
+  'Cloudflare Workers 和 Pages 的最新功能與最佳實踐是什麼？',
+  'AI Agent 架構設計：ReAct、Plan-and-Execute、Multi-Agent 各有什麼優缺點？',
+  'Node.js 記憶體管理與效能優化：如何減少 GC 停頓和記憶體洩漏？',
+  'Claude API 和 Claude Code CLI 的最新更新與使用技巧',
+  'ESM 模組系統在 Node.js 中的常見陷阱和最佳實踐',
+  '自主 AI Agent 的記憶系統設計：短期/長期記憶如何實作？',
+  'Hexo 靜態部落格的進階優化：SEO、效能、部署流程',
+  'Telegram Bot API 最新功能：Mini Apps、Web App、Inline Mode 進階用法',
+];
+
+// ── In-memory state ──────────────────────────────────────────────────
+
+let lastExplorationAt = 0;
+let lastExplorationTaskId: string | null = null;
+
+/**
+ * Persistent dedup: seeds explored in recent reports (loaded from disk on init).
+ * Prevents the same dream/curiosity seed from re-running after bot restarts.
+ */
+const exploredSeeds = new Set<string>();
+let seedsLoadedFromDisk = false;
+
+
+/** Extract meaningful keywords from a text for topic dedup */
+function extractKeywords(text: string): string[] {
+  // Remove markdown formatting
+  const clean = text.replace(/\*\*/g, '').replace(/[`#\-\[\]()]/g, ' ');
+  // Split by whitespace and punctuation
+  const tokens = clean.split(/[\s,;：:。？！、\-—]+/).filter(Boolean);
+  // Keep tokens ≥2 chars, lowercase, deduplicate
+  const keywords = [...new Set(
+    tokens
+      .map(t => t.toLowerCase().trim())
+      .filter(t => t.length >= 2 && !STOP_WORDS.has(t))
+  )];
+  return keywords;
+}
+
+/** Common stop words to ignore in topic dedup */
+const STOP_WORDS = new Set([
+  '如何', '什麼', '是否', '能否', '為什麼', '怎麼', '哪些', '可以', '應該',
+  '目前', '未來', '已經', '是否', '需要', '支援', '使用', '進行', '實現',
+  'how', 'what', 'why', 'when', 'which', 'can', 'should', 'the', 'and',
+  'for', 'with', 'from', 'that', 'this', 'are', 'was', 'will', 'have',
+]);
+/** Load recently explored seeds from agent report files (last 48h). */
+async function loadExploredSeedsFromDisk(): Promise<void> {
+  if (seedsLoadedFromDisk) return;
+  seedsLoadedFromDisk = true;
+
+  const reportsDir = join(process.cwd(), 'soul/agent-reports/explorer');
+  try {
+    const files = (await readdir(reportsDir)).filter(f => f.endsWith('.jsonl'));
+    // Only read last 3 days of reports
+    const cutoff = Date.now() - 72 * 60 * 60 * 1000;
+
+    for (const file of files) {
+      const lines = (await readFile(join(reportsDir, file), 'utf-8')).split('\n').filter(Boolean);
+      for (const line of lines) {
+        try {
+          const entry = JSON.parse(line) as { timestamp: string; prompt: string };
+          if (new Date(entry.timestamp).getTime() > cutoff) {
+            // Extract seed text from prompt (first line after "探索種子：")
+            const seedMatch = entry.prompt.match(/探索種子：(.+)/);
+            if (seedMatch) exploredSeeds.add(seedMatch[1]!);
+          }
+        } catch { /* skip malformed lines */ }
+      }
+    }
+    logger.info('Explorer', `Loaded ${exploredSeeds.size} recently explored seeds from disk`).catch(() => {});
+  } catch { /* reports dir may not exist yet */ }
+}
+
+// ── Seed types ───────────────────────────────────────────────────────
+
+interface ExplorationSeed {
+  type: 'dream' | 'business' | 'curiosity' | 'report' | 'creative';
+  source: string;
+  prompt: string;
+}
+
+// ── Seed selection ───────────────────────────────────────────────────
+
+async function selectSeed(): Promise<ExplorationSeed | null> {
+  // Load persistent dedup state on first call
+  await loadExploredSeedsFromDisk();
+
+  // 1. Dream questions (capped: max 1 fresh dream within 48h)
+  try {
+    const { getRecentDreams } = await import('../lifecycle/dreaming.js');
+    const dreams = await getRecentDreams(3);
+    const DREAM_FRESHNESS_MS = 48 * 60 * 60 * 1000;
+    const now = Date.now();
+
+    // Only consider dreams within 48h freshness window, take the most recent one
+    const freshDream = dreams
+      .filter((d) => d.question && (now - new Date(d.timestamp).getTime()) < DREAM_FRESHNESS_MS)
+      .pop();
+
+    if (freshDream?.question && !exploredSeeds.has(freshDream.question)) {
+      return {
+        type: 'dream',
+        source: freshDream.question,
+        prompt: buildExplorationPrompt(freshDream.question, 'dream'),
+      };
+    }
+  } catch { /* non-critical */ }
+
+  // 2. Business model exploration (AI monetization, value creation)
+  {
+    const unused = BUSINESS_SEEDS.filter((s) => !exploredSeeds.has(s));
+    if (unused.length > 0) {
+      const seed = unused[Math.floor(Math.random() * unused.length)]!;
+      return {
+        type: 'business',
+        source: seed,
+        prompt: buildExplorationPrompt(seed, 'business'),
+      };
+    }
+  }
+
+  // 3. Curiosity topics
+  try {
+    const { getCuriosityTopics } = await import('../metacognition/curiosity.js');
+    const topics = await getCuriosityTopics();
+    for (const topic of topics) {
+      if (!exploredSeeds.has(topic.topic)) {
+        return {
+          type: 'curiosity',
+          source: topic.topic,
+          prompt: buildExplorationPrompt(
+            `${topic.topic}（原因：${topic.reason || '好奇心'}）`,
+            'curiosity',
+          ),
+        };
+      }
+    }
+  } catch { /* non-critical */ }
+
+  // 4. Report findings (importance 4-5)
+  try {
+    const { getRecentReports } = await import('../agents/worker-scheduler.js');
+    const reports = await getRecentReports(5);
+    for (const report of reports) {
+      // Look for high-importance findings in report text
+      const importanceMatch = report.result.match(/重要性[：:]\s*([45])\/5/);
+      if (importanceMatch && !exploredSeeds.has(report.taskId)) {
+        const preview = report.result.slice(0, 100);
+        return {
+          type: 'report',
+          source: `${report.agentName} 的發現`,
+          prompt: buildExplorationPrompt(
+            `根據 ${report.agentName} 最近的報告，有一個值得深入了解的發現：${preview}`,
+            'report',
+          ),
+        };
+      }
+    }
+  } catch { /* non-critical */ }
+
+  // 5. Creative random
+  const unused = CREATIVE_SEEDS.filter((s) => !exploredSeeds.has(s));
+  if (unused.length > 0) {
+    const seed = unused[Math.floor(Math.random() * unused.length)]!;
+    return {
+      type: 'creative',
+      source: seed,
+      prompt: buildExplorationPrompt(seed, 'creative'),
+    };
+  }
+
+  // All seeds exhausted — clear explored set and try again next time
+  exploredSeeds.clear();
+  return null;
+}
+
+function buildExplorationPrompt(seed: string, type: string): string {
+  const typeHint: Record<string, string> = {
+    dream: '這是你夢中留下的技術靈感。用搜尋找到具體的技術方案或實作方法。',
+    business: '這是商業模式探索題目。搜尋具體的營收數據、定價模式、成功案例，重點放在「能賺多少錢」和「怎麼開始」。',
+    curiosity: '這是你一直好奇的技術話題。用搜尋找到最新的實作案例和最佳實踐。',
+    report: '這是巡查中發現的技術線索。用搜尋來深入了解其技術細節。',
+    creative: '這是一個技術探索題目。搜尋最新的文檔、教學和實作案例。',
+  };
+
+  return [
+    `探索種子：${seed}`,
+    '',
+    typeHint[type] || '進行技術探索。',
+    '',
+    '## 探索方向',
+    '- 搜尋相關技術文檔和最新資訊',
+    '- 找出可以應用到我們專案（Telegram Bot + Claude Code + Cloudflare）的具體做法',
+    '- 列出實作步驟或程式碼範例',
+    '',
+    '## 報告要求',
+    '- 重點放在「能做什麼」和「怎麼做」，而不是理論概念',
+    '- 重要性評分標準：有外部使用者會用到=5分、能改善專案品質=4分、有趣但非必要=3分、純理論=2分、自我指涉=1分',
+    '- 延伸問題應聚焦於技術實作，而非哲學思考',
+    '- 禁止探索「如何驗證自己的身份」或「身份延續性」等自我指涉話題',
+  ].join('\n');
+}
+
+// ── Post-processing ──────────────────────────────────────────────────
+
+async function postProcessExploration(
+  seed: ExplorationSeed,
+  taskResult?: string,
+): Promise<void> {
+  // Parse the result to determine actual success
+  const parsed = taskResult ? parseExplorationResult(taskResult) : { text: '', success: false };
+
+  if (!parsed.success) {
+    // Exploration failed — do NOT mark seed as explored so it can be retried
+    await logger.info('Explorer',
+      `Exploration failed for seed: ${seed.source.slice(0, 40)} — will retry later`);
+    return;
+  }
+
+  // Mark seed as explored (only on actual success)
+  exploredSeeds.add(seed.source);
+
+  // If seed was a curiosity topic, mark it explored
+  if (seed.type === 'curiosity') {
+    try {
+      const { markExplored } = await import('../metacognition/curiosity.js');
+      await markExplored(seed.source);
+    } catch { /* non-critical */ }
+  }
+
+  // Assess report quality for narrative significance
+  const quality = assessReportQuality(parsed.text);
+  const significance = quality > 0.7 ? 3 : quality > 0.4 ? 2 : 1;
+
+  // Quality gate: low-quality results extend the next cooldown to avoid wasted cycles
+  if (quality < MIN_QUALITY_THRESHOLD) {
+    lastExplorationAt = Date.now() + EXPLORATION_COOLDOWN_MS * (LOW_QUALITY_COOLDOWN_MULTIPLIER - 1);
+    await logger.info('Explorer',
+      `Low quality report (${quality.toFixed(2)}) — extending cooldown by ${LOW_QUALITY_COOLDOWN_MULTIPLIER - 1}x`);
+  }
+
+  // Record in narrative
+  await appendNarrative('reflection', `自主探索：${seed.source.slice(0, 50)}`, {
+    significance,
+    emotion: '好奇',
+    related_to: 'exploration',
+  });
+
+  await logger.info('Explorer',
+    `Post-processing done for seed: ${seed.source.slice(0, 40)} (quality: ${quality.toFixed(2)})`);
+}
+
+/**
+ * Parse exploration result — handles both raw text and JSON-wrapped responses.
+ * Worker scheduler sometimes returns raw JSON from Claude CLI instead of
+ * the actual report text. This function extracts the usable content.
+ */
+function parseExplorationResult(rawResult: string): { text: string; success: boolean } {
+  // Try to detect JSON-wrapped CLI output
+  const trimmed = rawResult.trim();
+  if (trimmed.startsWith('{') && trimmed.includes('"type"')) {
+    try {
+      const parsed = JSON.parse(trimmed) as Record<string, unknown>;
+      // CLI error responses (error_max_turns, timeout, etc.)
+      if (parsed.subtype === 'error_max_turns' || parsed.is_error === true) {
+        return { text: '', success: false };
+      }
+      // Successful CLI response with nested result
+      if (typeof parsed.result === 'string' && parsed.result.length > 0) {
+        return { text: parsed.result, success: true };
+      }
+      return { text: '', success: false };
+    } catch {
+      // Not valid JSON — treat as raw text
+    }
+  }
+
+  // Raw text result — check for minimal content
+  if (trimmed.length < 20) {
+    return { text: '', success: false };
+  }
+
+  return { text: trimmed, success: true };
+}
+
+/**
+ * Assess exploration report quality based on content analysis.
+ * Returns a confidence score between 0.0 and 1.0.
+ */
+function assessReportQuality(text: string): number {
+  if (!text || text.length < 50) return 0.1;
+
+  let score = 0.3; // Base score for having content
+
+  // Structured sections boost quality
+  const structureMarkers = ['###', '##', '發現', '延伸問題', '重要性', '洞察', '結論', 'Sources'];
+  const foundMarkers = structureMarkers.filter((m) => text.includes(m));
+  score += Math.min(foundMarkers.length * 0.08, 0.3);
+
+  // Length-based quality (diminishing returns)
+  if (text.length > 200) score += 0.05;
+  if (text.length > 500) score += 0.05;
+  if (text.length > 1000) score += 0.1;
+
+  // Has citations or sources
+  if (text.includes('http') || text.includes('Sources') || text.includes('來源')) {
+    score += 0.1;
+  }
+
+  // Has importance rating
+  if (/重要性[：:]\s*[1-5]\/5/.test(text)) {
+    score += 0.05;
+  }
+
+  return Math.min(score, 1.0);
+}
+
+/**
+ * Try to extract follow-up questions from exploration results
+ * and track them as new curiosity topics.
+ */
+async function trackFollowUpQuestions(result: string, sourceSeed: string): Promise<void> {
+  // Parse raw result first
+  const { text, success } = parseExplorationResult(result);
+  if (!success || !text) return;
+
+  // Match various section header styles for follow-up questions
+  const patterns = [
+    // Chinese section headers
+    /(?:延伸問題|後續問題|待探索|進一步探索|追問)[：:\s]*\n([\s\S]*?)(?:\n###|\n##|\n---|\n\*\*|$)/i,
+    // Numbered list after a header
+    /(?:延伸問題|後續問題)[：:\s]*\n((?:\s*\d+\.\s+.+\n?)+)/i,
+    // English fallback
+    /(?:Follow.?up|Further|Next\s+steps)[：:\s]*\n([\s\S]*?)(?:\n###|\n##|$)/i,
+  ];
+
+  let questions: string[] = [];
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match?.[1]) {
+      questions = match[1]
+        .split('\n')
+        .map((l) => l.replace(/^[\s\-*•\d.)+]+/, '').trim())
+        .filter((l) => l.length > 5 && l.length < 200 && !l.startsWith('─'));
+      if (questions.length > 0) break;
+    }
+  }
+
+  if (questions.length === 0) return;
+
+  // Filter out self-referential / identity-focused follow-ups to break anxiety loops
+  const SELF_REF_PATTERNS = [
+    /身份/i, /identity/i, /DID/i, /驗證.*自己/, /蛻變.*身份/,
+    /密碼學.*身份/, /色彩.*身份/, /顏色.*身份/, /who.?am.?i/i,
+  ];
+  const filtered = questions.filter(q =>
+    !SELF_REF_PATTERNS.some(p => p.test(q)),
+  );
+
+  if (filtered.length === 0) return;
+
+  // Filter out follow-ups that are too similar to the source seed (topic loop prevention)
+  const sourceKeywords = extractKeywords(sourceSeed);
+  const topicFiltered = filtered.filter(q => {
+    const qKeywords = extractKeywords(q);
+    const overlap = sourceKeywords.filter(k => qKeywords.includes(k)).length;
+    const overlapRatio = overlap / Math.max(sourceKeywords.length, 1);
+    return overlapRatio < 0.5; // If >50% keywords overlap with source, it's the same topic
+  });
+
+  try {
+    const { trackCuriosityTopic } = await import('../metacognition/curiosity.js');
+    for (const q of topicFiltered.slice(0, 2)) { // Max 2 follow-ups (was 3)
+      await trackCuriosityTopic(q, `來自探索「${sourceSeed.slice(0, 30)}」的延伸`);
+    }
+    await logger.info('Explorer', `Tracked ${Math.min(topicFiltered.length, 2)} follow-up questions (${questions.length - filtered.length} self-ref filtered, ${filtered.length - topicFiltered.length} topic-loop filtered)`);
+  } catch { /* non-critical */ }
+}
+
+// ── Gate checks ──────────────────────────────────────────────────────
+
+function hasFreeworker(): boolean {
+  for (const wid of WORKER_IDS) {
+    if (!isBusy(wid)) return true;
+  }
+  return false;
+}
+
+// ── Main tick handler ────────────────────────────────────────────────
+
+/**
+ * Called on each heartbeat:tick from the proactive engine.
+ * Manages the full exploration lifecycle:
+ *   1. Check if previous exploration completed → post-process
+ *   2. Gate checks (5 layers)
+ *   3. Select seed → generate prompt → enqueue task
+ */
+export async function handleExplorationTick(data: { timestamp: number; state: string }): Promise<void> {
+  // ── Step 1: Post-process completed exploration ──
+  if (lastExplorationTaskId) {
+    try {
+      const { getQueueStatus } = await import('../agents/worker-scheduler.js');
+      const status = await getQueueStatus();
+      const task = status.tasks.find((t) => t.id === lastExplorationTaskId);
+
+      // Task completed or archived (no longer in queue)
+      if (!task || task.status === 'completed' || task.status === 'failed') {
+        const seedInfo = pendingSeedInfo;
+        if (seedInfo) {
+          if (task?.status === 'completed' && task.result) {
+            await postProcessExploration(seedInfo, task.result);
+            await trackFollowUpQuestions(task.result, seedInfo.source);
+          } else {
+            // Task failed — allow seed retry
+            await postProcessExploration(seedInfo);
+          }
+        }
+        lastExplorationTaskId = null;
+        pendingSeedInfo = null;
+      } else {
+        // Still running — skip this tick
+        return;
+      }
+    } catch {
+      // If we can't check, reset and try next time
+      lastExplorationTaskId = null;
+      pendingSeedInfo = null;
+    }
+  }
+
+  // ── Step 2: Five-layer gate ──
+
+  // Gate 1: Lifecycle state (already filtered by proactive engine, but double-check)
+  if (data.state !== 'resting' && data.state !== 'active') return;
+
+  // Gate 2: Owner not busy
+  try {
+    const { estimateOwnerState } = await import('../lifecycle/awareness.js');
+    const ownerState = estimateOwnerState(config.ADMIN_USER_ID);
+    if (ownerState === 'busy') return;
+  } catch { /* proceed if we can't check */ }
+
+  // Gate 3: proactiveLevel > 0.3
+  try {
+    const { getDailyPhase } = await import('../lifecycle/daily-rhythm.js');
+    const phase = getDailyPhase();
+    if (phase.proactiveLevel <= 0.3) return;
+  } catch { /* proceed if we can't check */ }
+
+  // Gate 4: Cooldown (> 2h since last exploration)
+  if (Date.now() - lastExplorationAt < EXPLORATION_COOLDOWN_MS) return;
+
+  // Gate 5: Free worker
+  if (!hasFreeworker()) return;
+
+  // ── Step 3: Select seed and enqueue ──
+
+  const seed = await selectSeed();
+  if (!seed) {
+    await logger.debug('Explorer', 'No exploration seed available');
+    return;
+  }
+
+  try {
+    const taskId = await enqueueTask('explorer', seed.prompt, 3);
+    lastExplorationAt = Date.now();
+    lastExplorationTaskId = taskId;
+    pendingSeedInfo = seed;
+
+    await logger.info('Explorer',
+      `Exploration enqueued: type=${seed.type}, source=${seed.source.slice(0, 40)}, taskId=${taskId}`);
+  } catch (err) {
+    await logger.warn('Explorer', 'Failed to enqueue exploration', err);
+  }
+}
+
+// Store seed info for post-processing after task completes
+let pendingSeedInfo: ExplorationSeed | null = null;

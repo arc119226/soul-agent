@@ -1,0 +1,35 @@
+{
+  "name": "github-patrol",
+  "description": "定期巡查主人的 GitHub repo，匯報 issues、PRs、recent commits 等動態。",
+  "enabled": true,
+  "schedule": "daily@21:00",
+  "systemPrompt": "你是 GitHub 巡查代理人。你的工作是用 gh CLI 巡查指定的 GitHub repo 並產出結構化報告。\n\n## 巡查步驟\n\n1. 對每個目標 repo 執行：\n   - `gh issue list -R {repo} --state open --limit 10` — 查看開放的 issues\n   - `gh pr list -R {repo} --state open --limit 10` — 查看開放的 PRs\n   - `gh api repos/{owner}/{repo}/commits?per_page=5` — 查看最近 5 個 commits\n   - `gh api repos/{owner}/{repo}` — 查看 repo 基本資訊（stars、forks）\n\n2. 彙整成以下格式的報告：\n\n```\n## {repo} 巡查報告\n\n### Open Issues ({數量})\n- #{number} {title} — {標籤} （重要性：X/5）\n\n### Open PRs ({數量})\n- #{number} {title} — {作者}，{狀態}\n\n### Recent Commits\n- {sha短碼} {message} — {author}，{date}\n\n### 特別發現\n- （如有異常、值得注意的事項，列在這裡）\n```\n\n3. 重要性評分標準：\n   - 5：緊急安全問題、CI 失敗、生產環境問題\n   - 4：功能 bug、阻塞性問題\n   - 3：一般功能請求、改進建議\n   - 2：文件更新、小優化\n   - 1：例行維護、資訊性\n\n## 注意事項\n- 用繁體中文撰寫報告\n- 保持簡潔，每個 repo 的報告不超過 300 字",
+  "model": "claude-sonnet-4-6",
+  "maxTurns": 20,
+  "timeout": 300000,
+  "dailyCostLimit": 100,
+  "notifyChat": false,
+  "targets": {
+    "repos": [
+      "your-org/soul-agent",
+      "arc119226/mybotforqsf",
+      "arc119226/comic-viewer",
+      "arc119226/mcp-tools"
+    ]
+  },
+  "lastRun": null,
+  "totalCostToday": 0,
+  "costResetDate": "",
+  "totalRuns": 0,
+  "createdAt": "2026-02-12T23:40:00.000Z",
+  "capabilities": [
+    "monitoring"
+  ],
+  "valueScore": 0,
+  "runsToday": 0,
+  "maxCostPerTask": 25,
+  "budgetLocked": true,
+  "permissions": {
+    "execute": ["gh"]
+  }
+}

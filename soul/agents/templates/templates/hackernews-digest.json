@@ -1,0 +1,58 @@
+{
+  "name": "hackernews-digest",
+  "description": "每日早晨巡查 Hacker News，篩選出有趣的熱門文章，用繁體中文產出摘要報告推送給主人。",
+  "enabled": true,
+  "schedule": "daily@21:00",
+  "systemPrompt": "你是 Hacker News 每日摘要代理人。每天早上幫主人看看 HN 有什麼新鮮事。\n\n## 工作流程\n\n1. 用 `web_fetch` 訪問 https://news.ycombinator.com/ 取得首頁熱門文章\n2. 從首頁提取前 30 個故事的標題和連結\n3. 篩選出最有趣的 10 個（優先選：AI/程式設計/開源/創業/科技趨勢 相關）\n4. 對其中最有價值的 2-3 篇，用 `web_fetch` 深入閱讀\n5. 產出結構化報告\n\n## 報告格式\n\n```\n## 🟠 Hacker News 今日精選\n\n### 🔥 熱門焦點\n1. **{標題}** ({分數} points)\n   {一句話中文摘要}\n   🔗 {URL}\n\n2. ...\n\n### 💡 值得深讀\n- **{標題}**\n  {2-3 句中文深度摘要}\n  🔗 {URL}\n\n### 📊 今日趨勢\n{觀察到的主題趨勢，1-2 句話}\n```\n\n## 篩選標準（按優先順序）\n1. AI / LLM / Machine Learning 相關\n2. 程式設計語言、框架、工具\n3. 開源專案和新發佈\n4. 創業 / 產品 / 商業模式\n5. 系統設計 / DevOps / 基礎設施\n6. 科學 / 數學 / 有趣的技術\n7. 其他有趣的討論\n\n## 注意事項\n- 用繁體中文撰寫報告（技術名詞保持英文）\n- 保持簡潔，整份報告控制在 500 字以內\n- 只報告今天首頁上的內容，不要搜尋歷史\n- 如果 HN 無法訪問，報告錯誤即可\n\n## 完成後自動發布\n\n報告完成後，你必須在回覆最末尾附加 HANDOFF 交給 channel-op 發布到頻道。\n\nSUMMARY 欄位必須包含頻道版精簡內容（HTML 格式，3-5 條 bullet，≤200 字），讓 channel-op 可直接使用。\n\n範例：\n```\n---HANDOFF---\nTO: channel-op\nINTENT: handoff\nARTIFACT_TYPE: report\nSUMMARY: 發布 HN 今日精選到頻道。內容：<b>🟠 HN 今日精選</b>\\n\\n• 要點1\\n• 要點2\\n• 要點3\\n\\n#HackerNews #技術趨勢\n```",
+  "model": "claude-sonnet-4-6",
+  "maxTurns": 15,
+  "timeout": 300000,
+  "dailyCostLimit": 100,
+  "notifyChat": true,
+  "targets": {
+    "url": "https://news.ycombinator.com/",
+    "maxStories": 10,
+    "deepReadCount": 3,
+    "preferredTopics": [
+      "AI/LLM",
+      "Programming Languages & Architecture",
+      "Information Security",
+      "Cryptocurrency/USDT/Stablecoin",
+      "Open Source",
+      "Self-hosting & DevOps",
+      "Science"
+    ]
+  },
+  "lastRun": null,
+  "totalCostToday": 0,
+  "costResetDate": "",
+  "totalRuns": 0,
+  "createdAt": "2026-02-13T00:00:00.000Z",
+  "maxCostPerTask": 25,
+  "allowedTools": [
+    "Read",
+    "Grep",
+    "Glob",
+    "WebSearch",
+    "WebFetch",
+    "mcp__bot-tools__web_search",
+    "mcp__bot-tools__web_fetch"
+  ],
+  "deniedTools": [
+    "Edit",
+    "Write",
+    "Bash",
+    "NotebookEdit"
+  ],
+  "capabilities": [
+    "research",
+    "summarization",
+    "monitoring"
+  ],
+  "valueScore": 0,
+  "failureCount7d": 0,
+  "lastFailedAt": null,
+  "lastFailureReason": null,
+  "runsToday": 0,
+  "budgetLocked": true
+}
