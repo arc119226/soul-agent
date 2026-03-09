@@ -58,7 +58,7 @@ function invalidateQueueCache(): void {
 }
 
 /** Max number of concurrent worker CLI processes */
-export const MAX_CONCURRENT_WORKERS = 3;
+export const MAX_CONCURRENT_WORKERS = 2;
 
 /** Startup grace period — don't dispatch scheduled tasks for 2 min after boot */
 const STARTUP_GRACE_MS = 2 * 60 * 1000;
