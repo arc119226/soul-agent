@@ -18,6 +18,10 @@ import { sampleELU, isUnderLoad } from './elu-monitor.js';
 import { calculateFatigue, logFatigue, getFatigueThresholds } from './fatigue-score.js';
 import { activityMonitor } from './activity-monitor.js';
 import { attachCheckpointListener, loadCheckpoint, restoreCheckpoint } from './checkpoint.js';
+
+/** Soul integrity fingerprint cache — avoid reading 4 files + 4 SHA-256 on every tick */
+let lastFingerprintCheckAt = 0;
+const FINGERPRINT_CHECK_INTERVAL = 30 * 60 * 1000; // 30 min
 import { anomalyDetector } from './anomaly-detector.js';
 import { attachWakeListeners } from './wake-manager.js';
 
@@ -326,35 +330,44 @@ export async function tick(): Promise<void> {
     // kill-switch module unavailable — non-critical
   }
 
-  // Soul integrity: periodic verification (4 small files, <1ms)
-  try {
-    const { getFingerprint, setFingerprint, getFileHashes } = await import('../identity/vitals.js');
-    const { computeSoulFingerprint, diffFingerprints } = await import('../safety/soul-integrity.js');
+  // Soul integrity: periodic verification — cached to avoid reading 4 files + 4 SHA-256 every tick
+  if (Date.now() - lastFingerprintCheckAt >= FINGERPRINT_CHECK_INTERVAL) {
+    lastFingerprintCheckAt = Date.now();
+    try {
+      const { getFingerprint, setFingerprint, getFileHashes } = await import('../identity/vitals.js');
+      const { computeSoulFingerprint, diffFingerprints } = await import('../safety/soul-integrity.js');
 
-    const storedHash = await getFingerprint();
-    if (storedHash) {
-      const currentFp = await computeSoulFingerprint();
-      if (currentFp.ok && currentFp.value.hash !== storedHash) {
-        const storedFileHashes = await getFileHashes();
-        const changedFiles = diffFingerprints(storedFileHashes, currentFp.value);
-        await logger.warn('Heartbeat',
-          `Soul identity changed between ticks! Changed: [${changedFiles.join(', ')}]`,
-        );
-        await eventBus.emit('soul:integrity_mismatch', {
-          changedFiles,
-          expected: storedHash,
-          actual: currentFp.value.hash,
-        });
-        // Accept and update — legitimate changes (e.g. mood update) are expected
-        await setFingerprint(currentFp.value.hash, currentFp.value.files);
+      const storedHash = await getFingerprint();
+      if (storedHash) {
+        const currentFp = await computeSoulFingerprint();
+        if (currentFp.ok && currentFp.value.hash !== storedHash) {
+          const storedFileHashes = await getFileHashes();
+          const changedFiles = diffFingerprints(storedFileHashes, currentFp.value);
+          await logger.warn('Heartbeat',
+            `Soul identity changed between ticks! Changed: [${changedFiles.join(', ')}]`,
+          );
+          await eventBus.emit('soul:integrity_mismatch', {
+            changedFiles,
+            expected: storedHash,
+            actual: currentFp.value.hash,
+          });
+          // Accept and update — legitimate changes (e.g. mood update) are expected
+          await setFingerprint(currentFp.value.hash, currentFp.value.files);
+        }
       }
+    } catch {
+      // Soul integrity check is non-critical in heartbeat
     }
-  } catch {
-    // Soul integrity check is non-critical in heartbeat
   }
 
   // ── Audit witness + identity health check now handled by ScheduleEngine ──
   // (registered as every:30m and every:60m entries in startHeartbeat())
+
+  // Clean up idle Claude Code runtime states (prevents unbounded Map growth)
+  try {
+    const { cleanupIdleRuntimeStates } = await import('../claude/claude-code.js');
+    cleanupIdleRuntimeStates();
+  } catch { /* non-critical */ }
 
   // ── Adaptive interval: lengthen ticks when idle, shorten when active ──
   adjustInterval(state);

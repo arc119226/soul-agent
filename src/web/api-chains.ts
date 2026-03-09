@@ -301,6 +301,7 @@ export async function getAgentConfig(name: string): Promise<Record<string, unkno
       budgetLocked: cfg.budgetLocked,
       scheduleLocked: cfg.scheduleLocked,
       promptLocked: cfg.promptLocked,
+      personality: cfg.personality,
     };
   } catch (err) {
     logger.warn('API-Chains', `getAgentConfig(${name}) failed`, err);

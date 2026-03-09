@@ -472,7 +472,7 @@ async function handleTaskCompleted(data: {
   }
 
   // Check total budget
-  const template = templateCache.get(run.teamName) ?? await loadTeamTemplate(run.teamName);
+  const template = getCachedTemplate(run.teamName) ?? await loadTeamTemplate(run.teamName);
   if (template && run.totalCostUsd > template.budget.maxTotalCostUsd) {
     await logger.warn('PipelineEngine',
       `Pipeline ${run.id} budget exceeded: $${run.totalCostUsd.toFixed(4)} > $${template.budget.maxTotalCostUsd}`);
@@ -1277,16 +1277,38 @@ function cleanupTaskMappings(runId: string): void {
 
 // ── Template Cache (for synchronous schema lookup) ───────────────────
 
-const templateCache = new Map<string, TeamTemplate>();
+const TEMPLATE_CACHE_TTL = 30 * 60 * 1000; // 30 min
+const TEMPLATE_CACHE_MAX = 20;
+const templateCache = new Map<string, { template: TeamTemplate; expireAt: number }>();
 
 /** Cache a template for synchronous lookups (called during pipeline start/advance). */
 function cacheTemplate(template: TeamTemplate): void {
-  templateCache.set(template.name, template);
+  // Evict oldest if at capacity
+  if (templateCache.size >= TEMPLATE_CACHE_MAX) {
+    let oldestKey: string | null = null;
+    let oldestTime = Infinity;
+    for (const [key, val] of templateCache) {
+      if (val.expireAt < oldestTime) { oldestTime = val.expireAt; oldestKey = key; }
+    }
+    if (oldestKey) templateCache.delete(oldestKey);
+  }
+  templateCache.set(template.name, { template, expireAt: Date.now() + TEMPLATE_CACHE_TTL });
+}
+
+/** Get cached template with TTL check */
+function getCachedTemplate(teamName: string): TeamTemplate | undefined {
+  const entry = templateCache.get(teamName);
+  if (!entry) return undefined;
+  if (Date.now() > entry.expireAt) {
+    templateCache.delete(teamName);
+    return undefined;
+  }
+  return entry.template;
 }
 
 /** Look up the output schema name and validation mode for a stage from the cached template. */
 function getStageSchema(teamName: string, stageId: string): { schema: string; blocking: boolean } | null {
-  const template = templateCache.get(teamName);
+  const template = getCachedTemplate(teamName);
   if (!template) return null;
 
   const stage = template.workflow.stages.find((s) => s.id === stageId);

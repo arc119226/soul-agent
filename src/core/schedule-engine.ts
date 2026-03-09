@@ -205,7 +205,15 @@ class ScheduleEngine {
         due.push(entry);
       } else if (parsed.type === 'interval') {
         const lastMs = this.lastRunMs.get(entry.id) ?? 0;
-        if (nowMs - lastMs >= parsed.ms) {
+        const elapsed = nowMs - lastMs;
+        if (elapsed >= parsed.ms) {
+          // If overdue by >2x interval, bot was likely offline — reset timer instead of firing
+          // This prevents schedule avalanche on startup (all interval agents firing at once)
+          if (lastMs > 0 && elapsed > parsed.ms * 2) {
+            this.lastRunMs.set(entry.id, nowMs);
+            logger.info('ScheduleEngine', `Skipping overdue interval entry ${entry.id} (${Math.round(elapsed / 60000)}min late, reset timer)`);
+            continue;
+          }
           due.push(entry);
         }
       }

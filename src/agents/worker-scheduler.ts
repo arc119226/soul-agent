@@ -14,7 +14,7 @@
  *   - Workers never touch code or soul/ (except agent-reports/)
  */
 
-import { readFile, writeFile, stat, unlink } from 'node:fs/promises';
+import { readFile, writeFile, stat, unlink, access, constants } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tailReadJsonl } from '../core/tail-read.js';
 import { randomUUID } from 'node:crypto';
@@ -59,6 +59,10 @@ function invalidateQueueCache(): void {
 
 /** Max number of concurrent worker CLI processes */
 export const MAX_CONCURRENT_WORKERS = 3;
+
+/** Startup grace period — don't dispatch scheduled tasks for 2 min after boot */
+const STARTUP_GRACE_MS = 2 * 60 * 1000;
+const startupTime = Date.now();
 
 /** Worker channel IDs (negative userIds that don't collide with real users) */
 const WORKER_IDS = [-1, -2, -3, -4, -5, -6, -7, -8] as const;
@@ -1248,8 +1252,10 @@ async function processQueue(): Promise<void> {
       // kill-switch unavailable — proceed normally
     }
 
-    // 1. Check scheduled agents and enqueue if due
-    await checkScheduledAgents();
+    // 1. Check scheduled agents and enqueue if due (skip during startup grace period)
+    if (Date.now() - startupTime >= STARTUP_GRACE_MS) {
+      await checkScheduledAgents();
+    }
 
     // 2. Load current queue
     const queue = await loadQueue();
@@ -1527,14 +1533,14 @@ async function handleTick(data: { timestamp: number; state: string }): Promise<v
  */
 async function checkDispatchSignal(): Promise<void> {
   try {
-    await stat(DISPATCH_SIGNAL);
-    // Signal exists — remove it and process queue
-    try { await unlink(DISPATCH_SIGNAL); } catch { /* already removed by race */ }
-    await logger.info('WorkerScheduler', 'Dispatch signal detected, processing queue...');
-    await processQueue();
+    await access(DISPATCH_SIGNAL, constants.F_OK);
   } catch {
-    // No signal file — nothing to do
+    return; // No signal file — fast path, no Error object creation
   }
+  // Signal exists — remove it and process queue
+  try { await unlink(DISPATCH_SIGNAL); } catch { /* already removed by race */ }
+  await logger.info('WorkerScheduler', 'Dispatch signal detected, processing queue...');
+  await processQueue();
 }
 
 export function startWorkerScheduler(): void {
@@ -1567,10 +1573,10 @@ export function startWorkerScheduler(): void {
   tickHandler = (data) => { handleTick(data); };
   eventBus.on('heartbeat:tick', tickHandler);
 
-  // Poll for MCP dispatch signal every 10s (faster than heartbeat tick for responsiveness)
+  // Poll for MCP dispatch signal every 60s (reduced from 10s to save idle CPU)
   dispatchPollTimer = setInterval(() => {
     checkDispatchSignal().catch(() => {/* non-fatal */});
-  }, 10_000);
+  }, 60_000);
 
   logger.info('WorkerScheduler', 'Worker scheduler started (listening to heartbeat:tick + dispatch signal)');
 }

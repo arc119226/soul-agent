@@ -9,9 +9,9 @@ export type ModelTier = 'haiku' | 'sonnet' | 'opus';
 
 /** Per-tier timeout for user-facing Claude Code calls (ms) */
 export const MODEL_TIMEOUTS: Record<ModelTier, number> = {
-  haiku: 60_000,    // 1 min
-  sonnet: 180_000,  // 3 min
-  opus: 600_000,    // 10 min
+  haiku: 120_000,     // 2 min
+  sonnet: 300_000,    // 5 min
+  opus: 1_800_000,    // 30 min — main consciousness should not timeout easily
 };
 
 export interface RouteDecision {

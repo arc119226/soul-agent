@@ -34,6 +34,9 @@ const MIN_QUALITY_THRESHOLD = 0.3;
 /** Cooldown multiplier when quality is below threshold (next exploration delayed 3x) */
 const LOW_QUALITY_COOLDOWN_MULTIPLIER = 3;
 
+/** Max explored seeds to keep in memory (FIFO eviction) */
+const MAX_EXPLORED_SEEDS = 200;
+
 /** Worker IDs to check for availability */
 const WORKER_IDS = [-1, -2, -3] as const;
 
@@ -119,7 +122,13 @@ async function loadExploredSeedsFromDisk(): Promise<void> {
           if (new Date(entry.timestamp).getTime() > cutoff) {
             // Extract seed text from prompt (first line after "探索種子：")
             const seedMatch = entry.prompt.match(/探索種子：(.+)/);
-            if (seedMatch) exploredSeeds.add(seedMatch[1]!);
+            if (seedMatch) {
+              if (exploredSeeds.size >= MAX_EXPLORED_SEEDS) {
+                const first = exploredSeeds.values().next().value;
+                if (first) exploredSeeds.delete(first);
+              }
+              exploredSeeds.add(seedMatch[1]!);
+            }
           }
         } catch { /* skip malformed lines */ }
       }
@@ -275,6 +284,11 @@ async function postProcessExploration(
   }
 
   // Mark seed as explored (only on actual success)
+  // Cap size to prevent unbounded growth
+  if (exploredSeeds.size >= MAX_EXPLORED_SEEDS) {
+    const first = exploredSeeds.values().next().value;
+    if (first) exploredSeeds.delete(first);
+  }
   exploredSeeds.add(seed.source);
 
   // If seed was a curiosity topic, mark it explored

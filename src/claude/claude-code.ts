@@ -76,6 +76,18 @@ interface RuntimeState {
 
 const runtimeState = new Map<number, RuntimeState>();
 
+/** Clean up idle runtime states (no active process, not busy) to prevent unbounded Map growth */
+export function cleanupIdleRuntimeStates(): number {
+  let cleaned = 0;
+  for (const [userId, rt] of runtimeState.entries()) {
+    if (!rt.childProcess && !rt.busyPromise) {
+      runtimeState.delete(userId);
+      cleaned++;
+    }
+  }
+  return cleaned;
+}
+
 function getRuntime(userId: number): RuntimeState {
   let rt = runtimeState.get(userId);
   if (!rt) {
@@ -463,6 +475,16 @@ function spawnClaudeOnce(
     const timeout = opts?.timeout ?? config.CLAUDE_CODE_TIMEOUT;
     const timer = setTimeout(() => {
       child.kill('SIGTERM');
+      // SIGKILL fallback — if SIGTERM doesn't kill within 5s, force kill to prevent zombies
+      const killTimer = setTimeout(() => {
+        try {
+          if (!child.killed) {
+            child.kill('SIGKILL');
+            logger.warn('claude-code', `PID ${child.pid} didn't respond to SIGTERM, force killed`);
+          }
+        } catch { /* process already dead */ }
+      }, 5000);
+      killTimer.unref();
       if (rl) { rl.close(); rl = null; }
       if (settled) return;
       settled = true;
