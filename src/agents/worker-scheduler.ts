@@ -1051,12 +1051,27 @@ async function executeTask(task: AgentTask, workerId: number): Promise<void> {
                   break;
                 }
 
+                // Skip known non-agent keywords (PM sometimes writes these)
+                const HANDOFF_SKIP_KEYWORDS = ['NONE', 'CONFIRM', 'DONE', 'END', 'CTO', 'N/A'];
+                if (HANDOFF_SKIP_KEYWORDS.includes(targetAgent.toUpperCase())) {
+                  await logger.info('WorkerScheduler',
+                    `Skipping non-agent HANDOFF target "${targetAgent}" from task ${task.id}`);
+                  continue;
+                }
+
+                // Validate target agent exists before dispatching
+                const targetCfg = await loadAgentConfig(targetAgent);
+                if (!targetCfg) {
+                  await logger.warn('WorkerScheduler',
+                    `HANDOFF target "${targetAgent}" from task ${task.id} does not exist — skipping`);
+                  continue;
+                }
+
                 const feedbackIterationTag = handoff.intent === 'feedback'
                   ? `[feedbackIteration: ${currentIteration + 1}]`
                   : '';
 
-                // Read target agent config for per-agent handoff context cap
-                const targetCfg = await loadAgentConfig(targetAgent);
+                // targetCfg already loaded above during validation
                 const handoffCap = targetCfg?.handoffContextCap ?? PIPELINE_CONTEXT_CAP;
 
                 // Write artifact file for full output

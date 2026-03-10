@@ -9,6 +9,9 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      BOT_TOKEN: "0000000000:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+      ALLOWED_USERS: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
